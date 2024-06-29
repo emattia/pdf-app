@@ -1,0 +1,4 @@
+**/__pycache__
+**/.svelte-kit
+**/node_modules
+backend/data
