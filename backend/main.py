@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routers import pdf, llm
+from routers import pdf_chat
 
 app = FastAPI()
 
@@ -12,9 +12,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(pdf.router)
-app.include_router(llm.router)
+app.include_router(pdf_chat.router)
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    log_config = uvicorn.config.LOGGING_CONFIG
+    log_config["formatters"]["access"]["fmt"] = "%(asctime)s - %(levelname)s - %(message)s"
+    log_config["formatters"]["default"]["fmt"] = "%(asctime)s - %(levelname)s - %(message)s"
+    uvicorn.run(app, host="0.0.0.0", port=8000, log_config=log_config)

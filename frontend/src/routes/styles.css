@@ -224,18 +224,9 @@
 
 	--toastBackground: #dae8e2;
 	--toastColor: #31302f;
-	--toastHeight: 50px;
-	--toastWidth: 300px;
-	--toastMargin: 10px;
-	--toastPadding: 10px;
-	--toastBorder: 1px solid #31302f;
-	--toastBorderRadius: 10px;
-	--toastBtnWidth: 20px;
-	--toastBtnHeight: 20px;
-	--toastBtnFont: 20px sans-serif;
-	--toastBtnContent: 'X';
 	--toastBarBackground: #dae8e2;
-	--toastBarHeight: 5px;
+
+	--headerHeight: 3rem;
 	
 
 }

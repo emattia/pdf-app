@@ -1,8 +1,21 @@
 FROM python:3.12
 WORKDIR /api
 ENV POETRY_VIRTUALENVS_CREATE=false
-RUN pip install poetry
+RUN apt-get update && apt-get install -y libhdf5-dev 
+# RUN pip install poetry
 COPY . .
-RUN poetry install
+# RUN poetry install
+# TODO: fix poetry build issue with building h5py wheel
+# NOTE: pymupdf 1.24.7 breaks in a container on Apple M-series
+RUN pip install \
+    fastapi==0.111.0 \
+    uvicorn==0.30.1 \
+    pymupdf==1.24.5 \ 
+    scikit-learn==1.5.0 \
+    openai==1.35.7 \
+    tensorflow==2.16.2 \
+    tensorflow-hub==0.16.1
+RUN mkdir -p /tmp/models/universal-sentence-encoder && \
+    curl -L "https://tfhub.dev/google/universal-sentence-encoder/4?tf-hub-format=compressed" | tar -zxvC /tmp/models/universal-sentence-encoder
 EXPOSE 8000
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

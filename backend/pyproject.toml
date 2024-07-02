@@ -9,6 +9,11 @@ readme = "README.md"
 python = "^3.12"
 fastapi = "^0.111.0"
 uvicorn = "^0.30.1"
+pymupdf = "^1.24.7"
+scikit-learn = "^1.5.0"
+openai = "^1.35.7"
+tensorflow = "^2.16.2"
+tensorflow-hub = "^0.16.1"
 
 
 [build-system]

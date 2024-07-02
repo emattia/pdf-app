@@ -1,56 +1,86 @@
 <script lang='ts'>
+
 	import { onMount } from "svelte";
 	import { loader } from './loader';
-	import { writable  } from 'svelte/store';
-	import PdfViewer from '$lib/components/PdfViewer.svelte';
+	import { writable } from 'svelte/store';
 
-	// import { toast } from '@zerodevx/svelte-toast';
-  
-	let data: any; 
+	import resetIcon from '$lib/images/reset.svg';
+	import closePdfIcon from '$lib/images/close-pdf.svg';
+	import pdfIcon from '$lib/images/pdf.svg';
+
+	// PDF things
+	import PdfViewer from '$lib/components/PdfViewer.svelte';
+	import { toast } from '@zerodevx/svelte-toast';
+
+	// FastAPI server
 	let endpoint: string = 'http://127.0.0.1:8000';
-	let api: string = 'upload-pdf-file';
+	let uploadAPI: string = 'upload-pdf-file';
+	let chatPdfAPI: string = 'pdf-chat'; 
+
+	// Svelte stores for PDF file upload
 	let loading = writable(false);
 	let hasUploadedFile = writable(false);
 	let uploadedFileLocalPath = writable(null);
-	let url = writable(null);
 	let base64Data = writable('');
-  
-	onMount(async () => {
-	});
 
+	// user AI interaction
+	import MessageCard from "../../lib/components/MessageCard.svelte";
+	let loadingChatTurn = writable(false);
+
+	// The user has one conversation. 
+	// It is a list of messages in a Svelte store, 
+	// so values can be set from outside this component.
+	// Or, in this case, the conversation can be persisted across page navigations.
+	let messages = writable([]);
+	// Current status of what the user has typed.
+	let prompt = '';
+
+	let data: any; 
+	let pageNum = writable(1);
+
+	// messages.update(() => {
+	// 	return [
+	// 	 { 'content': 'Hi, I am a user', 'role': 'user' },
+	// 	 { 'content': 'Hi, I am an AI', 'role': 'assistant' }
+	// 	];
+	// });
+  
 	async function uploadFile(e: any) {
-	
 		base64Data.set('');
 		hasUploadedFile.set(false);
 		loading.set(true);
-
-		console.log(e.target.files[0])
 
 		const file = e.target.files[0];
 		const formData = new FormData();
 		formData.append('uf', file);
 
 		const res = await fetch(
-			`${endpoint}/${api}`,
+			`${endpoint}/${uploadAPI}`,
 			{
 				method: 'POST',
 				body: formData
 			}
 		);
 
-		// toast.push('File uploaded successfully!');
+		toast.push('File uploaded successfully!');
 
 		if (res.ok) {
+			// Wait for API server to init the RAG stuff.
 			data = await res.json();
 			hasUploadedFile.set(true);
+			// Load the PDF file for viewing in browser.
 			const base64String: any = await pdfToBase64(file);
 			base64Data.set(base64String);
 			uploadedFileLocalPath.set(file.name);
+			// Use initial summary of the PDF given by LM API.
+			messages.update((msgs) => {
+				return [...msgs, { 'content': data.summary, 'role': 'assistant' }];
+			});
+			console.log('[DEBUG] Add AI summary to message history.');
 			loading.set(false);
 		} else {
 			loading.set(false);
 		}
-
 	}
 
 	const pdfToBase64 = (file: any) => {
@@ -66,7 +96,59 @@
 			reader.readAsDataURL(file);
 		});
 	};
-  
+
+	async function chat() {
+		loadingChatTurn.set(true);
+
+		// TODO: Filter out empty prompts / prompts with only spaces / etc.
+		messages.update((msgs) => {
+			return [...msgs, { 'content': prompt, 'role': 'user' }];
+		});
+
+		console.log('[DEBUG] User prompt:', prompt);
+		const queryParams = new URLSearchParams({
+			question: prompt,
+			ctx_messages: JSON.stringify($messages)
+		});
+		const res = await fetch(
+			`${endpoint}/${chatPdfAPI}?${queryParams.toString()}`,
+			{
+				method: 'GET',
+				headers: {
+					'accept': 'application/json'
+				}
+			}
+		);
+
+		if (res.ok) {
+			const data = await res.json();
+			console.log('[DEBUG] AI response:', data.answer);
+			messages.update((msgs) => [...msgs, { 'content': data.answer, 'role': 'assistant' }]);
+			loadingChatTurn.set(false);
+		} else {
+			console.log('[ERROR]', res);
+			loadingChatTurn.set(false);
+		}
+	}
+
+	function handleKeyPress(event) {
+		if (event.key === 'Enter' && !event.shiftKey) {
+			event.preventDefault();
+			chat();
+			prompt = '';
+		}
+		if (event.key === 'Enter' && event.shiftKey) {
+			prompt += '\n';
+		}
+	}
+
+	onMount(() => {
+		const loaderNode = document.querySelector('.loader-container');
+		// const loaderContainerChatNode = document.querySelector('.loader-container-chat');
+		loader(loaderNode, loading);
+		// loader(loaderContainerChatNode, loadingChatTurn);
+	});
+
 </script>
   
 <svelte:head>
@@ -74,152 +156,302 @@
 	<meta name="description" content="About this app" />
 </svelte:head>
 
-<div class='main'> 
-	<div class='left-col'>
-		<label for="file-upload" class="custom-file-upload">
-			<p class='file-upload-text'>
-				Upload PDF
-			</p>
-		</label>
-		<input id="file-upload" type="file" accept=".pdf" on:change={e => uploadFile(e)} />
-		{#if $hasUploadedFile}
-			<h4>
-				{#if $uploadedFileLocalPath}
-					{$uploadedFileLocalPath}
-				{:else}
-					'No file uploaded'
-				{/if}
-			</h4>
-			<div class='pdf'> 
-				<PdfViewer data={$base64Data} />
-			</div>		
-		{/if}
-	</div>
-
+<div class='main'>
+	<div class='loader-container'></div>
 	{#if $hasUploadedFile}
+		<div class='left-col'>
+			<div class='header-left-col'>
+				<button 
+					class="close-pdf"
+					on:click={
+						() => {
+							messages.set([]);
+							hasUploadedFile.set(false);
+							uploadedFileLocalPath.set(null);
+							base64Data.set('');
+						}
+					}
+				>
+					<img src={closePdfIcon} alt="Close" />
+				</button>
+				<div>
+					<p class='current-pdf-label'>
+						{#if $uploadedFileLocalPath}
+							{$uploadedFileLocalPath}
+						{:else}
+							'No file uploaded'
+						{/if}
+					</p>
+				</div>	
+			</div>
+			<div class='pdf'> 
+				<PdfViewer data={$base64Data} pageNum={$pageNum} />
+			</div>		
+		</div>
 		<div class='right-col'>
-			<h2 class='right-col-title'>Chat</h2>
+			<div class='header-right-col'>
+				<h2 class='right-col-title'>Chat</h2>
+				<button 
+					class="reset-chat"
+					on:click={
+						() => {
+							messages.set([]);
+							toast.push('Chat history emptied.');
+						}
+					}
+				>
+					<img src={resetIcon} alt="Reset" />
+				</button>
+			</div>
+			<div class='message-container'>
+				{#each $messages as message, i}
+					<div class="message {message.role === 'user' ? 'message-user' : 'message-ai'}">
+						<MessageCard width='75%'>
+							<p style="text-align: 'left'}; color: black'};">
+								{message.role === 'user' ? 'User' : 'AI'}: {message.content}
+							</p>
+						</MessageCard>
+					</div>
+				{/each}
+			</div>
 			<div class='chat-bar'>
-				<input type="text" placeholder="Type your prompt..." class="chat-input">
-				<button class="send-button">Send</button>
+				<input 
+					type="text" 
+					placeholder="Type your prompt..."
+					class="chat-input"
+					bind:value={prompt}
+					on:keypress={handleKeyPress}
+				>
+				<button 
+					class="send-button"
+					on:click={
+						() => {
+							chat();
+						}
+					}
+				>
+					Send
+				</button>
 			</div>
 		</div>
+	{:else}
+		{#if $loading}
+			<div style='opacity: 0.25;'>
+				<div class='both-col'>
+				</div>
+			</div>
+		{:else}
+			<div class='both-col'>
+				
+				<label for="file-upload" class="custom-file-upload">
+					<img src={pdfIcon} alt="PDF" />
+					<p class='file-upload-text'>
+						Upload PDF
+					</p>
+				</label>
+				<input id="file-upload" type="file" accept=".pdf" on:change={e => uploadFile(e)} />
+			</div>
+		{/if}
+
 	{/if}
+
 </div>
 
-{#if $loading}
-	{#await loader}
-		<div>Loading...</div>
-	{/await}
-{/if}
 
-  <style>
+<style>
 
 	.main {
-        display: flex;
+		display: flex;
+		align-items: center;  
+		justify-content: center;
+		flex: 1;
 		height: 100%;
-		max-height: 100%;
-		min-height: 100%;
 		overflow: hidden;
-    }
-
-	input[type="file"] {
-	  display: none;
+		position: relative;
 	}
-  
-	/* https://stackoverflow.com/questions/572768/styling-an-input-type-file-button */
+
+	.loader-container {
+		position: absolute;
+		top: 50%;
+		left: 50%;
+		transform: translate(-50%, -50%);
+	}
+
+	.both-col {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		overflow: hidden;
+		width: 100%;
+	}
+
+	.left-col, .right-col {
+		display: flex;
+		flex-direction: column;
+		justify-content: flex-start;
+		align-items: center;
+		width: 50%;
+		height: calc(100vh - 2 * var(--headerHeight));
+		overflow: hidden;
+	}
+
+	.left-col {
+		background: linear-gradient(to right, var(--sand-100), var(--sand-200));
+	}
+
 	.custom-file-upload {
-		display: inline-block;
+		display: flex;
 		padding: 6px 12px;
 		cursor: pointer;
-		background-color: var(--green-200);
-		text-emphasis-color: var(--green-200);
+		align-items: center;
+		background-color: var(--sand-300);
 		border-radius: 8px;
-		border-top: 0;
-		margin-top: .5rem;
-		margin-bottom: .5rem;
+		white-space: nowrap; 
+		width: auto; 
 	}
 
-	h4 {
-		margin-bottom: 1rem;
-		margin-left: 6rem;
-		margin-right: 6rem;
-		text-align: left;
+	.custom-file-upload:hover {
+		background-color: var(--purple-200);
+		border-style: solid;
+		border-width: 3px;
+		border-color: var(--purple-300);
 	}
-  
+
+	.current-pdf-label {
+		text-align: start;
+		font-style: italic;
+		font-size: 1rem;
+		color: var(--black);
+	}
+
+	input[type="file"] {
+		display: none;
+	} 
+
 	.file-upload-text {
-		color: var(--sand-200);
+		color: var(--black);
+		cursor: pointer;
+		margin-left: .5rem;
 	}
-  
-	.left-col {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        height: 87vh;
-		overflow: hidden;
-        width: 50%;
-    }
 
-    .right-col {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: start;
-        height: 87vh;
-        width: 50%;
-    }
+	.right-col {
+		background: linear-gradient(to right, var(--sand-200), var(--sand-100));
+	}
+
+	.header-right-col, .header-left-col {
+		margin-top: 2rem;
+		padding-left: 10%;
+		padding-right: 10%;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		justify-content: space-between;
+		height: 4vh;
+		min-height: 4vh;
+	}
+
+	.header-right-col {
+		width: 100%;
+	}
+
+	.header-left-col {
+		width: auto;
+		min-width: 70%;
+		max-width: 100%;
+	}
 
 	.right-col-title {
-		margin-top: 2rem;
+		text-align: start;
+		margin-left: 2rem;
+	}
+
+	.close-pdf {
+		border: none;
+		cursor: pointer;
+		transition: background-color 0.3s ease;
+		margin-right: 1rem;
+	}
+
+	.reset-chat {
+		border: none;
+		cursor: pointer;
+		transition: background-color 0.3s ease;
+		margin-right: 2rem;
 	}
 
 	.pdf {
-		min-height: 10%;
-		max-height: 82vh;
-		min-width: 20%;
-		max-width: 90%;
+		/* min-height: 10%;
+		max-height: 82vh; */
 		z-index: 10;
-		background-color: var(--purple-100);
-		border: 12px solid var(--purple-100);
-		/* rounded: 8px; */
-		border-radius: 8px;
 	}
-  
+
+	.message-container {
+		overflow-y: auto;
+		height: calc(100vh - 4 * var(--headerHeight));
+		max-height: calc(100vh - 6 * var(--headerHeight));
+		width: 100%;
+		margin-left: 2rem;
+		margin-right: 2rem;
+	}
+
 	.chat-bar {
 		position: absolute;
-		bottom: 10%;
-		width: 40%;
-		background-color: var(--sand-200);
+		bottom: 2%;
+		width: 46%;
+		background-color: var(--sand-300);
 		padding: 1rem;
 		border-radius: 8px;
-		box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* Optional: Adds a subtle shadow */
+		box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); 
 		display: flex;
-		/* align-items: center; */
 		justify-content: space-between;
-		z-index: 20; /* Optional: Ensures it's above other elements */
+		z-index: 20;
 	}
-  
+
 	.chat-input {
-		flex: 1; /* Take up all available space */
-		border: none; /* Remove the border */
-		padding: 0.5rem; /* Add some padding */
-		border-radius: 8px; /* Optional: Adds some border radius */
+		flex: 1; 
+		border: none; 
+		padding: 0.5rem; 
+		border-radius: 8px;
+		background-color: var(--sand-100); 
 	}
-  
+
+	.chat-input:focus-visible {
+		border: 2px solid var(--purple-300);
+		border-radius: 3px;
+		outline: none;
+	}
+
 	.send-button {
 		padding: 0.5rem 1rem;
 		border: none;
 		border-radius: 8px;
-		background-color: var(--purple-200);
-		color: var(--sand-200);
+		background-color: var(--sand-100);
+		color: var(--purple-400);
 		cursor: pointer;
 		transition: background-color 0.3s ease;
 		margin-left: 1rem;
 	}
-  
+
 	.send-button:hover {
-	  	background-color: var(--purple-300);
+		background-color: var(--purple-400);
+		color: var(--sand-100);
 	}
-  </style>
-  
+
+	.message {
+		display: flex;
+		margin-bottom: .5rem;
+		margin-top: .5rem;
+		margin-left: 2rem;
+		margin-right: 2rem;
+	}
+
+	.message-user {
+		justify-content: flex-end;
+	}
+
+	.message-ai {
+		justify-content: flex-start;
+	}
+
+</style>

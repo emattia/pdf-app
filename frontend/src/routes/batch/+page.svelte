@@ -1,3 +1,15 @@
-<div>
-	hi
+<div class='main'>
+	<h1>hi mf</h1>
 </div>
+
+<style>
+	.main {
+		display: flex;
+		align-items: center;  
+		justify-content: center;
+		flex: 1;
+		height: 100%;
+		overflow: hidden;
+		position: relative;
+	}
+</style>

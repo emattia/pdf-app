@@ -1,11 +1,11 @@
 <script>
 	import { page } from '$app/stores';
-	import logo from '$lib/images/svelte-logo.svg';
+	import logo from '$lib/images/outerbounds.png';
 	import github from '$lib/images/github.svg';
 </script>
 
 <header>
-	<div class="corner">
+	<div class="corner-left">
 		<a href="https://outerbounds.co/get-started">
 			<img src={logo} alt="Outerbounds" />
 		</a>
@@ -31,7 +31,7 @@
 		</svg>
 	</nav>
 
-	<div class="corner">
+	<div class="corner-right">
 		<a href="https://github.com/sveltejs/kit">
 			<img src={github} alt="GitHub" />
 		</a>
@@ -41,16 +41,18 @@
 <style>
 	header {
 		display: flex;
+		flex: 0 0 auto;
 		justify-content: space-between;
-		background-color: var(--sand-200);
+		background-color: var(--sand-100);
+		height: var(--headerHeight);
 	}
 
-	.corner {
-		width: 3em;
-		height: 3em;
+	.corner-left {
+		width: 10em;
+		height: var(--headerHeight);
 	}
 
-	.corner a {
+	.corner-left a {
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -58,8 +60,27 @@
 		height: 100%;
 	}
 
-	.corner img {
-		width: 2em;
+	.corner-left img {
+		width: 8em;
+		height: 2em;
+		object-fit: contain;
+	}
+
+	.corner-right {
+		width: 3em;
+		height: var(--headerHeight);
+	}
+
+	.corner-right a {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 100%;
+		height: 100%;
+	}
+
+	.corner-right img {
+		width: 3em;
 		height: 2em;
 		object-fit: contain;
 	}
@@ -89,7 +110,7 @@
 		justify-content: center;
 		align-items: center;
 		list-style: none;
-		background: var(--background);
+		background: var(--sand-300);
 		background-size: contain;
 	}
 
@@ -114,7 +135,7 @@
 		display: flex;
 		height: 100%;
 		align-items: center;
-		padding: 0 0.5rem;
+		padding: 0 2.5rem;
 		color: var(--color-text);
 		font-weight: 700;
 		font-size: 0.8rem;
@@ -125,6 +146,7 @@
 	}
 
 	a:hover {
-		color: var(--color-theme-1);
+		color: var(--black);
+		font-size: 1rem;
 	}
 </style>

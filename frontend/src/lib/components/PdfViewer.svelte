@@ -8,6 +8,7 @@
   
     let pdf: any = null;
     let pageNum = writable(1);
+    let gotoPageNum = 1;
     let totalPages = writable(0);
     let canvas: any;
     let context: any;
@@ -39,8 +40,10 @@
     const nextPage = () => {
         pageNum.update(n => {
             if (n < get(totalPages)) {
-                renderPage(n + 1);
-                return n + 1;
+                const newPageNum = n + 1;
+                renderPage(newPageNum);
+                gotoPageNum = newPageNum;
+                return newPageNum;
             }
             return n;
         });
@@ -49,13 +52,14 @@
     const prevPage = () => {
         pageNum.update(n => {
             if (n > 1) {
-                renderPage(n - 1);
-                return n - 1;
+                const newPageNum = n - 1;
+                renderPage(newPageNum);
+                gotoPageNum = newPageNum;
+                return newPageNum;
             }
             return n;
         });
     };
-
     const loadPdf = async () => {
         if (browser) {
             
@@ -68,7 +72,7 @@
                 pdf = await pdfjsLib.getDocument(url).promise;
             }
             if (pdf) {
-                totalPages.set(pdf.numPages);
+                totalPages.set(pdf.numPages as number);
                 context = canvas.getContext('2d');
                 renderPage(get(pageNum));
             }
@@ -85,6 +89,14 @@
 
     $: url, data, totalPages, loadPdf();
 
+    const rerenderPdf = () => {
+        if (gotoPageNum < 1 || gotoPageNum > get(totalPages)) {
+            return;
+        }
+        pageNum.set(gotoPageNum);
+        renderPage(gotoPageNum);
+    }
+
 </script>
   
 <style>
@@ -100,6 +112,7 @@
         flex-direction: row;
         justify-content: space-between; 
         margin-top: 1rem;
+        margin-bottom: .25rem;
         width: 100%;
     }
 
@@ -107,7 +120,7 @@
         display: flex; 
         justify-content: center;
         align-items: center;
-        margin-left: 1rem;
+        margin-right: 1rem;
     }
 
     .page-ctrl {
@@ -115,14 +128,30 @@
         justify-content: flex-end;
         align-items: center;
         margin-left: auto; 
+        /* margin-right: 1rem; */
+    }
+
+    .goto-page-input {
+        width: 3rem;
         margin-right: 1rem;
     }
+
 </style>
 
 <div class='pdf-controller'>
     <button class='paginate-btn' on:click={prevPage} disabled={$pageNum <= 1}>Previous</button>
     <button class='paginate-btn' on:click={nextPage} disabled={$pageNum >= $totalPages}>Next</button>
-    <p class='page-ctrl'> {$pageNum} / {$totalPages} </p>
+    <div class='page-ctrl'> 
+        <input 
+            class='goto-page-input' 
+            type='number' 
+            bind:value={gotoPageNum} 
+            on:change={rerenderPdf} 
+            min={1} 
+            max={$totalPages} 
+        /> 
+        <p>{$pageNum} / {$totalPages} </p>
+    </div>
 </div>
   
 <canvas bind:this={canvas} />

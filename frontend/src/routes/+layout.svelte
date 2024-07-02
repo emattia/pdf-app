@@ -1,37 +1,40 @@
 <script>
 	import Header from './Header.svelte';
 	import './styles.css';
-	// import { SvelteToast } from '@zerodevx/svelte-toast'
+	import { SvelteToast } from '@zerodevx/svelte-toast'
 
   </script>
   
-  <div class="app">
+  <body class="app">
 	
 	<Header />
   
 	<main class='main'>
 	  <slot />
-	  <!-- <SvelteToast /> -->
+	  <SvelteToast />
 	</main>
   
 	<footer>
 	  <p>Visit <a href="https://outerbounds.com/get-started/">outerbounds.com</a> to build hundreds of apps like this in your cloud account</p>
 	</footer>
-  </div>
+  </body>
   
   <style>
 
-	.app {
-	  display: flex;
-	  flex-direction: column;
-	  background-color: var(--sand-100);
+	body {
+		height: 100%;
+		margin: 0;
+		display: flex;
+		flex-direction: column;
+		background-color: var(--sand-100);
 	}
   
 	main {
 		flex: 1;
 		display: flex;
+		height: calc(100vh - 2 * var(--headerHeight));
 		flex-direction: column;
-		padding: 1rem;
+		/* padding: 1rem; */
 		box-sizing: border-box;
     }
   
@@ -47,6 +50,7 @@
 		position: sticky;
 		bottom: 0;
 		width: 100%;
+		height: var(--headerHeight);
 	}
   
 	footer a {
