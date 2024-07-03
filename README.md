@@ -6,20 +6,23 @@ The frontend service is a SvelteKit application.
 
 ### Set OpenAI key
 
-Create a file call `.env` in the root directory and put only your OpenAI key in it.
+Create a file called `.env` in the root directory and put only your OpenAI key in it.
 `docker-compose.yml` will include this file's variables to the `backend` container environment.
 
 ## Run manually
+Install the required pip packages (you may reference the backend Dockerfile for the necessary packages and versions). It is recommended to perform this in a conda environment.
 
 ### Start backend
 ```
 cd pdf-app/backend
-uvicorn main:app --host 0.0.0.0 --port 8000
+uvicorn main:app --host 127.0.0.1 --port 8000
 ```
 
 ### Run frontend
 ```
 cd pdf-app/frontend
+npm install
+npm run build
 npm run dev
 ```
 

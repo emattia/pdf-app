@@ -4,7 +4,7 @@ import os
 import json
 import subprocess
 import requests
-
+from dotenv import load_dotenv
 
 try:
     import pymupdf as fitz  # available with v1.24.3
@@ -18,6 +18,7 @@ from fitz import Document as FitzDocument
 from fastapi import APIRouter, UploadFile
 from sklearn.neighbors import NearestNeighbors
 
+load_dotenv()
 
 router = APIRouter()
 
@@ -353,7 +354,7 @@ async def pdf_chat(question: str, ctx_messages: str):
             "Return a JSON object with the following format: \n\n"
             "{\n"
             f'  "query": "{question}",\n'
-            f'  "citations": "[{'Page Number'}]",\n'
+            f'  "citations": "[Page Number]",\n'
             '  "answer": "Answer here"\n'
             "}\n\n"
             "Answer step-by-step. Include the page number in the most relevant citations. "
