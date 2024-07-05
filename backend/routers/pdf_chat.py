@@ -4,7 +4,7 @@ import os
 import json
 import subprocess
 import requests
-from dotenv import load_dotenv
+
 
 try:
     import pymupdf as fitz  # available with v1.24.3
@@ -18,7 +18,6 @@ from fitz import Document as FitzDocument
 from fastapi import APIRouter, UploadFile
 from sklearn.neighbors import NearestNeighbors
 
-load_dotenv()
 
 router = APIRouter()
 
@@ -33,7 +32,7 @@ chunks = None  # List of vectors/embeddings.
 assert "OPENAI_API_KEY" in os.environ, "Please set OPENAI_API_KEY environment variable."
 oai_compatible_client = OpenAI(
     api_key=os.getenv("OPENAI_API_KEY"),
-    # base_url="http://0.0.0.0:8000/v1", api_key="not-used" # NIM
+    # base_url="http://127.0.0.1:8000/v1", api_key="na"
 )
 
 ### Tuning and model selection. ###
@@ -93,46 +92,6 @@ class SemanticSearchModel:
         )
         self.embedding_model = hub.load(TEXT_EMBEDDING_MODEL_INFO["local_path"])
         self.fitted = False
-
-    # def _tfhub_download(self, remote_path, local_path):
-    #     """
-    #     Download the TensorFlow Hub model to the local path if it does not already exist.
-        
-    #     :param remote_path: The URL of the remote TensorFlow Hub model.
-    #     :param local_path: The local directory path where the model should be saved.
-    #     """
-    #     if os.path.exists(local_path):
-    #         print("[DEBUG] Local path exists.")
-    #         return
-
-    #     print("[DEBUG] Downloading TensorFlow Hub model.")
-    #     os.makedirs(local_path, exist_ok=True)
-    #     download_process = subprocess.run(
-    #         [
-    #             "curl",
-    #             "-L",
-    #             f"{remote_path}?tf-hub-format=compressed",
-    #             "|",
-    #             "tar",
-    #             "-zxvC",
-    #             local_path
-    #         ],
-    #         stdout=subprocess.PIPE,
-    #         stderr=subprocess.PIPE
-    #     )
-
-    #     if download_process.returncode != 0:
-    #         print(f"[ERROR] Failed to download model: {download_process.stderr.decode('utf-8')}")
-    #         return
-
-    #     if extract_process.returncode != 0:
-    #         print(f"[ERROR] Failed to extract model: {extract_process.stderr.decode('utf-8')}")
-    #         return
-
-    #     # Clean up the tar file
-    #     os.remove(f"{local_path}/model.tar.gz")
-
-    #     print("[DEBUG] Download and extraction complete.")
 
     def create_directory(self, path):
         """
@@ -354,7 +313,7 @@ async def pdf_chat(question: str, ctx_messages: str):
             "Return a JSON object with the following format: \n\n"
             "{\n"
             f'  "query": "{question}",\n'
-            f'  "citations": "[Page Number]",\n'
+            f'  "citations": "[{'Page Number'}]",\n'
             '  "answer": "Answer here"\n'
             "}\n\n"
             "Answer step-by-step. Include the page number in the most relevant citations. "
@@ -396,11 +355,11 @@ def process_pdf(pdf_file_path):
     Make a new SemanticSearchModel model, put it in M_search and fit it with the chunks.
     """
     global M_search, text_ls, chunks
-    # TODO part 1: user has been waiting since request gets to API server.
+    # User is waiting since request gets to API server.
     text_ls = pdf_to_text(pdf_file_path)
     chunks = text_to_chunks(text_ls)
     M_search.fit([c[0] for c in chunks])
-    # TODO part 2: now loading screen stops for user.
+    # On return, loading screen stops for user.
     return chunks
 
 
@@ -467,5 +426,3 @@ def text_to_chunks(
             chunk = f"[Page no. {token_idx+start_page}]" + " " + '"' + chunk_join + '"'
             chunks.append((chunk, page))
     return chunks
-
-
