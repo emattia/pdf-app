@@ -13,7 +13,7 @@
 	import { toast } from '@zerodevx/svelte-toast';
 
 	// FastAPI server
-	let endpoint: string = 'http://127.0.0.1:8000';
+	let endpoint: string = 'http://0.0.0.0:8000';
 	let uploadAPI: string = 'upload-pdf-file';
 	let chatPdfAPI: string = 'pdf-chat'; 
 
@@ -28,9 +28,6 @@
 	let loadingChatTurn = writable(false);
 
 	// The user has one conversation. 
-	// It is a list of messages in a Svelte store, 
-	// so values can be set from outside this component.
-	// Or, in this case, the conversation can be persisted across page navigations.
 	let messages = writable([]);
 	// Current status of what the user has typed.
 	let prompt = '';

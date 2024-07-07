@@ -6,7 +6,7 @@ COPY . .
 ENV NODE_ENV=production
 RUN npm run build
 
-FROM node:20.15.0-alpine3.20
+FROM node:20.15.0-alpine3.20 as app
 USER node:node
 WORKDIR /app
 COPY --from=builder --chown=node:node /app/build ./build

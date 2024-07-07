@@ -5,7 +5,7 @@ RUN apt-get update && apt-get install -y libhdf5-dev
 # RUN pip install poetry
 COPY . .
 # RUN poetry install
-# TODO: fix poetry build issue with building h5py wheel
+# TODO: fix poetry build issue with h5py wheel
 # NOTE: pymupdf 1.24.7 breaks in a container on Apple M-series
 RUN pip install \
     fastapi==0.111.0 \
@@ -13,9 +13,8 @@ RUN pip install \
     pymupdf==1.24.5 \ 
     scikit-learn==1.5.0 \
     openai==1.35.7 \
-    tensorflow==2.16.2 \
-    tensorflow-hub==0.16.1
-RUN mkdir -p /tmp/models/universal-sentence-encoder && \
-    curl -L "https://tfhub.dev/google/universal-sentence-encoder/4?tf-hub-format=compressed" | tar -zxvC /tmp/models/universal-sentence-encoder
+    sentence-transformers==3.0.1
+# RUN mkdir -p /tmp/models/universal-sentence-encoder && \
+#     curl -L "https://tfhub.dev/google/universal-sentence-encoder/4?tf-hub-format=compressed" | tar -zxvC /tmp/models/universal-sentence-encoder
 EXPOSE 8000
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -13,11 +13,10 @@ except ImportError:
 
 import numpy as np
 from openai import OpenAI
-import tensorflow_hub as hub
 from fitz import Document as FitzDocument
 from fastapi import APIRouter, UploadFile
 from sklearn.neighbors import NearestNeighbors
-
+from sentence_transformers import SentenceTransformer
 
 router = APIRouter()
 
@@ -32,7 +31,7 @@ chunks = None  # List of vectors/embeddings.
 assert "OPENAI_API_KEY" in os.environ, "Please set OPENAI_API_KEY environment variable."
 oai_compatible_client = OpenAI(
     api_key=os.getenv("OPENAI_API_KEY"),
-    # base_url="http://127.0.0.1:8000/v1", api_key="na"
+    # base_url="http://0.0.0.0:8000/v1", api_key="not-used" # NIM
 )
 
 ### Tuning and model selection. ###
@@ -40,13 +39,9 @@ DEFAULT_WORD_LENGTH = 100
 DEFAULT_BATCH_SIZE = 1000
 DEFAULT_N_NEIGHBORS = 8
 TEXT_EMBEDDING_MODEL_INFO = {
-    'remote_path': 'https://tfhub.dev/google/universal-sentence-encoder/4',
-    # "remote_path": "https://kaggle.com/models/google/universal-sentence-encoder/frameworks/TensorFlow2/variations/universal-sentence-encoder/versions/1",
-    "local_path": "/tmp/models/universal-sentence-encoder",
-    "model_name": "universal-sentence-encoder",
-    "model_version": "4",
-    "model_framework": "tensorflow",
-    "pretrained_model_provider": "TensorFlow Hub",
+    "model_name": "all-MiniLM-L6-v2",
+    "model_framework": "sentence-transformers",
+    "pretrained_model_provider": "Hugging Face",
     "use_case": "text-semantic-search",
 }
 LLM_MODEL_INFO = {
@@ -62,7 +57,7 @@ LLM_MODEL_INFO = {
 # A big model container M_search.
 # M_search affects what the user is shown
 # by modeling similarity between chunks of text in 1 to N PDFs.
-# M_search uses sklearn.neighbors.NearestNeighbors on Universal Sentence Encoder embeddings.
+# M_search uses sklearn.neighbors.NearestNeighbors on Sentence-Transformers embeddings.
 class SemanticSearchModel:
     """
     Manager for a semantic search model.
@@ -79,88 +74,15 @@ class SemanticSearchModel:
 
     def __init__(self):
         """
-        `use` expects a path to unzipped Universal Sentence Encoder model from TensorFlow Hub.
-        TODO: Support other models. sentence-transformers next.
+        `use` expects a path to a SentenceTransformer model from Hugging Face.
+        TODO: Support other models.
         Use M_search = SemanticSearchModel() to create a new instance.
         M_search.fit(data) to fit the model when a PDF is uploaded.
         M_search(text) to get the nearest neighbors of a new text at inference time,
             to give the LLM a boost.
         """
-        self._tfhub_download(
-            TEXT_EMBEDDING_MODEL_INFO["remote_path"], 
-            TEXT_EMBEDDING_MODEL_INFO["local_path"]
-        )
-        self.embedding_model = hub.load(TEXT_EMBEDDING_MODEL_INFO["local_path"])
+        self.embedding_model = SentenceTransformer(TEXT_EMBEDDING_MODEL_INFO["model_name"])
         self.fitted = False
-
-    def create_directory(self, path):
-        """
-        Create a directory if it does not exist.
-        
-        :param path: The directory path to create.
-        """
-        if not os.path.exists(path):
-            os.makedirs(path)
-            print(f"[DEBUG] Created directory at {path}.")
-        else:
-            print(f"[DEBUG] Directory already exists at {path}.")
-
-    def download_file(self, url, local_path):
-        """
-        Download a file from a URL to a local path.
-        
-        :param url: The URL to download the file from.
-        :param local_path: The local path to save the downloaded file.
-        """
-        response = requests.get(url, stream=True)
-        if response.status_code == 200:
-            with open(local_path, 'wb') as f:
-                for chunk in response.iter_content(chunk_size=8192):
-                    f.write(chunk)
-            print(f"[DEBUG] Downloaded file from {url} to {local_path}")
-        else:
-            print(f"[ERROR] Failed to download file from {url}")
-            response.raise_for_status()
-
-    def extract_tar_file(self, tar_path, extract_to):
-        """
-        Extract a tar.gz file to a specified directory.
-        
-        :param tar_path: The path to the tar.gz file.
-        :param extract_to: The directory to extract the contents to.
-        """
-        extract_process = subprocess.run(
-            ["tar", "-zxvf", tar_path, "-C", extract_to],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE
-        )
-        if extract_process.returncode == 0:
-            print(f"[DEBUG] Extracted tar file {tar_path} to {extract_to}")
-        else:
-            print(f"[ERROR] Failed to extract tar file: {extract_process.stderr.decode('utf-8')}")
-            extract_process.check_returncode()
-
-    def _tfhub_download(self, remote_url, local_dir):
-        """
-        Download and extract the TensorFlow Hub model to the local directory if it does not already exist.
-        
-        :param remote_url: The URL of the remote TensorFlow Hub model.
-        :param local_dir: The local directory where the model should be saved.
-        """
-        if os.path.exists(local_dir):
-            print("[DEBUG] Local directory exists.")
-            return
-
-        print("[DEBUG] Downloading TensorFlow Hub model.")
-        self.create_directory(local_dir)
-        
-        tar_file_path = os.path.join(local_dir, "model.tar.gz")
-        self.download_file(f"{remote_url}?tf-hub-format=compressed", tar_file_path)
-        self.extract_tar_file(tar_file_path, local_dir)
-        
-        # Clean up the tar file
-        os.remove(tar_file_path)
-        print("[DEBUG] Download and extraction complete.")
 
     def _get_text_embedding(self, texts, batch_size=DEFAULT_BATCH_SIZE):
         """
@@ -170,7 +92,7 @@ class SemanticSearchModel:
         n_texts = len(texts)
         for batch_start_idx in range(0, n_texts, batch_size):
             text_batch = texts[batch_start_idx : (batch_start_idx + batch_size)]
-            embedding_batch = self.embedding_model(text_batch)
+            embedding_batch = self.embedding_model.encode(text_batch)
             embeddings.append(embedding_batch)
         print("[DEBUG] Embedding batches:", len(embeddings))
         embeddings = np.vstack(embeddings)
@@ -199,7 +121,7 @@ class SemanticSearchModel:
         Return the nearest neighbors of a new text.
         """
         print("[DEBUG] Getting nearest neighbors of text:", text)
-        embedding = self.embedding_model([text])
+        embedding = self.embedding_model.encode([text])
         print("[DEBUG] Embedding:", embedding.shape)
         neighbors = self.nn.kneighbors(embedding, return_distance=False)[0]
         if return_data:
@@ -313,7 +235,7 @@ async def pdf_chat(question: str, ctx_messages: str):
             "Return a JSON object with the following format: \n\n"
             "{\n"
             f'  "query": "{question}",\n'
-            f'  "citations": "[{'Page Number'}]",\n'
+            f'  "citations": "[<Page Number>]",\n'
             '  "answer": "Answer here"\n'
             "}\n\n"
             "Answer step-by-step. Include the page number in the most relevant citations. "
@@ -355,11 +277,11 @@ def process_pdf(pdf_file_path):
     Make a new SemanticSearchModel model, put it in M_search and fit it with the chunks.
     """
     global M_search, text_ls, chunks
-    # User is waiting since request gets to API server.
+    # TODO part 1: user has been waiting since request gets to API server.
     text_ls = pdf_to_text(pdf_file_path)
     chunks = text_to_chunks(text_ls)
     M_search.fit([c[0] for c in chunks])
-    # On return, loading screen stops for user.
+    # TODO part 2: now loading screen stops for user.
     return chunks
 
 
