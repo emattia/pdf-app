@@ -54,6 +54,7 @@ LLM_MODEL_INFO = {
     "use_case": "document-chat",
 }
 
+
 # A big model container M_search.
 # M_search affects what the user is shown
 # by modeling similarity between chunks of text in 1 to N PDFs.
@@ -81,7 +82,9 @@ class SemanticSearchModel:
         M_search(text) to get the nearest neighbors of a new text at inference time,
             to give the LLM a boost.
         """
-        self.embedding_model = SentenceTransformer(TEXT_EMBEDDING_MODEL_INFO["model_name"])
+        self.embedding_model = SentenceTransformer(
+            TEXT_EMBEDDING_MODEL_INFO["model_name"]
+        )
         self.fitted = False
 
     def _get_text_embedding(self, texts, batch_size=DEFAULT_BATCH_SIZE):
@@ -128,6 +131,7 @@ class SemanticSearchModel:
             return [self.data[text_neighbs] for text_neighbs in neighbors]
         else:
             return neighbors
+
 
 M_search = SemanticSearchModel()
 # M_search is used in routes as a Python global variable. 😬

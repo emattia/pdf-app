@@ -4,3 +4,4 @@
 backend/data
 **/.env
 ./openai_key.txt
+**/.DS_Store
